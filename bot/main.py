@@ -14,6 +14,8 @@ from bot.database import (
     decrement_visit
 )
 
+import sqlite3
+
 user_state = {}
 
 prices = {
@@ -70,6 +72,36 @@ def format_date(date_str):
     return datetime.fromisoformat(date_str).strftime("%d.%m.%Y %H:%M")
 
 
+# -------- УВЕДОМЛЕНИЯ --------
+async def check_notifications(bot: Bot):
+    while True:
+        conn = sqlite3.connect("data/database.db")
+        cur = conn.cursor()
+
+        cur.execute("""
+        SELECT u.telegram_id, s.expires_at, s.visits_left, s.status
+        FROM subscriptions s
+        JOIN users u ON s.user_id = u.id
+        """)
+
+        rows = cur.fetchall()
+        conn.close()
+
+        for telegram_id, expires_at, visits, status in rows:
+            expires = datetime.fromisoformat(expires_at)
+            days_left = (expires - datetime.now()).days
+
+            if status == "active":
+                if days_left == 1:
+                    await bot.send_message(telegram_id, "Абонемент скоро закончится (1 день)")
+                if days_left <= 0:
+                    await bot.send_message(telegram_id, "Абонемент закончился")
+                if visits == 0:
+                    await bot.send_message(telegram_id, "Закончились посещения")
+
+        await asyncio.sleep(60)  # проверка каждую минуту
+
+
 async def main():
     print("Бот запускается...")
 
@@ -77,6 +109,9 @@ async def main():
 
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
+
+    # запускаем фоновые уведомления
+    asyncio.create_task(check_notifications(bot))
 
     @dp.message(Command("start"))
     async def start_handler(message: Message):
