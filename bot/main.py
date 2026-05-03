@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 import asyncio
 from datetime import datetime
 from aiogram import Bot, Dispatcher
