@@ -27,6 +27,15 @@ def init_db():
     )
     """)
 
+    # НОВОЕ — таблица посещений
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS visits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        visit_time TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -88,7 +97,7 @@ def get_subscription(telegram_id):
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT s.id, s.type, s.visits_left, s.expires_at, s.status, u.client_id
+    SELECT s.id, s.type, s.visits_left, s.expires_at, s.status, u.client_id, u.id
     FROM subscriptions s
     JOIN users u ON s.user_id = u.id
     WHERE u.telegram_id=?
@@ -128,12 +137,25 @@ def update_subscription_status(telegram_id):
     conn.close()
 
 
+def log_visit(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO visits (user_id, visit_time)
+    VALUES (?, ?)
+    """, (user_id, datetime.now().isoformat()))
+
+    conn.commit()
+    conn.close()
+
+
 def decrement_visit(telegram_id):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT s.id, s.visits_left, s.status
+    SELECT s.id, s.visits_left, s.status, u.id
     FROM subscriptions s
     JOIN users u ON s.user_id = u.id
     WHERE u.telegram_id=?
@@ -146,7 +168,7 @@ def decrement_visit(telegram_id):
         conn.close()
         return "Нет абонемента"
 
-    sub_id, visits, status = sub
+    sub_id, visits, status, user_id = sub
 
     if status != "active":
         conn.close()
@@ -169,6 +191,12 @@ def decrement_visit(telegram_id):
     SET visits_left=?, status=? 
     WHERE id=?
     """, (visits, new_status, sub_id))
+
+    # ЛОГИРОВАНИЕ ПОСЕЩЕНИЯ
+    cur.execute("""
+    INSERT INTO visits (user_id, visit_time)
+    VALUES (?, ?)
+    """, (user_id, datetime.now().isoformat()))
 
     conn.commit()
     conn.close()

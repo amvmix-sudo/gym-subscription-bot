@@ -14,10 +14,8 @@ from bot.database import (
     decrement_visit
 )
 
-# временное хранение выбранного тарифа
 user_state = {}
 
-# цены
 prices = {
     "Разовый": "300₽",
     "Недельный": "500₽",
@@ -69,8 +67,7 @@ def qr_menu():
 
 
 def format_date(date_str):
-    dt = datetime.fromisoformat(date_str)
-    return dt.strftime("%d.%m.%Y %H:%M")
+    return datetime.fromisoformat(date_str).strftime("%d.%m.%Y %H:%M")
 
 
 async def main():
@@ -81,46 +78,36 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    # --- START ---
     @dp.message(Command("start"))
     async def start_handler(message: Message):
         await message.answer("Добро пожаловать!", reply_markup=main_menu())
 
-    # --- КУПИТЬ ---
     @dp.message(lambda m: m.text == "Купить абонемент")
     async def buy(message: Message):
         await message.answer("Выбери тариф:", reply_markup=tariff_menu())
 
-    # --- ВЫБОР ТАРИФА ---
-    @dp.message(lambda m: m.text in ["Разовый", "Недельный", "Месячный", "Годовой"])
+    @dp.message(lambda m: m.text in prices.keys())
     async def choose_tariff(message: Message):
         user_state[message.from_user.id] = message.text
 
         await message.answer(
-            f"Тариф: {message.text}\n"
-            f"Стоимость: {prices[message.text]}\n\n"
-            f"Нажмите 'Оплатить'",
+            f"Тариф: {message.text}\nСтоимость: {prices[message.text]}",
             reply_markup=confirm_menu()
         )
 
-    # --- ОПЛАТА ---
     @dp.message(lambda m: m.text == "Оплатить")
     async def pay(message: Message):
         tariff = user_state.get(message.from_user.id)
 
         if not tariff:
-            await message.answer("Ошибка выбора тарифа", reply_markup=main_menu())
+            await message.answer("Ошибка", reply_markup=main_menu())
             return
 
         user_id = create_user(message.from_user.id)
         create_subscription(user_id, tariff)
 
-        await message.answer(
-            f"Абонемент '{tariff}' активирован!",
-            reply_markup=main_menu()
-        )
+        await message.answer("Оплата успешна!", reply_markup=main_menu())
 
-    # --- МОЙ АБОНЕМЕНТ ---
     @dp.message(lambda m: m.text == "Мой абонемент")
     async def my_sub(message: Message):
         update_subscription_status(message.from_user.id)
@@ -130,17 +117,16 @@ async def main():
             await message.answer("Нет абонемента")
             return
 
-        _, type_, visits, expires, status, client_id = sub
+        _, type_, visits, expires, status, client_id, _ = sub
 
         await message.answer(
             f"ID: {client_id}\n"
             f"Тип: {type_}\n"
             f"Осталось посещений: {visits}\n"
-            f"Действует до: {format_date(expires)}\n"
+            f"До: {format_date(expires)}\n"
             f"Статус: {status}"
         )
 
-    # --- QR ---
     @dp.message(lambda m: m.text == "Показать QR")
     async def qr(message: Message):
         update_subscription_status(message.from_user.id)
@@ -152,19 +138,14 @@ async def main():
 
         client_id = sub[5]
 
-        await message.answer(
-            f"Ваш QR (ID): {client_id}",
-            reply_markup=qr_menu()
-        )
+        await message.answer(f"Ваш ID: {client_id}", reply_markup=qr_menu())
 
-    # --- СПИСАНИЕ ---
     @dp.message(lambda m: m.text == "Подтвердить посещение")
     async def visit(message: Message):
         update_subscription_status(message.from_user.id)
         result = decrement_visit(message.from_user.id)
         await message.answer(result, reply_markup=main_menu())
 
-    # --- НАЗАД ---
     @dp.message(lambda m: m.text == "Назад")
     async def back(message: Message):
         await message.answer("Главное меню", reply_markup=main_menu())
