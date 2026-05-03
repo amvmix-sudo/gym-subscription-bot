@@ -58,6 +58,16 @@ def confirm_menu():
     )
 
 
+def subscription_menu():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Удалить абонемент")],
+            [KeyboardButton(text="Назад")]
+        ],
+        resize_keyboard=True
+    )
+
+
 def qr_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -70,6 +80,21 @@ def qr_menu():
 
 def format_date(date_str):
     return datetime.fromisoformat(date_str).strftime("%d.%m.%Y %H:%M")
+
+
+def delete_subscription(telegram_id):
+    conn = sqlite3.connect("data/database.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+    DELETE FROM subscriptions
+    WHERE user_id = (
+        SELECT id FROM users WHERE telegram_id=?
+    )
+    """, (telegram_id,))
+
+    conn.commit()
+    conn.close()
 
 
 # -------- УВЕДОМЛЕНИЯ --------
@@ -99,7 +124,7 @@ async def check_notifications(bot: Bot):
                 if visits == 0:
                     await bot.send_message(telegram_id, "Закончились посещения")
 
-        await asyncio.sleep(60)  # проверка каждую минуту
+        await asyncio.sleep(60)
 
 
 async def main():
@@ -110,7 +135,6 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
-    # запускаем фоновые уведомления
     asyncio.create_task(check_notifications(bot))
 
     @dp.message(Command("start"))
@@ -159,8 +183,14 @@ async def main():
             f"Тип: {type_}\n"
             f"Осталось посещений: {visits}\n"
             f"До: {format_date(expires)}\n"
-            f"Статус: {status}"
+            f"Статус: {status}",
+            reply_markup=subscription_menu()
         )
+
+    @dp.message(lambda m: m.text == "Удалить абонемент")
+    async def delete_sub(message: Message):
+        delete_subscription(message.from_user.id)
+        await message.answer("Абонемент удалён", reply_markup=main_menu())
 
     @dp.message(lambda m: m.text == "Показать QR")
     async def qr(message: Message):
