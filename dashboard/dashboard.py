@@ -30,47 +30,53 @@ def load_subscriptions():
     return [x[0] for x in data]
 
 
-def plot_by_days(visits):
-    days = [v.strftime("%A") for v in visits]
-    counter = Counter(days)
-
-    plt.figure()
-    plt.title("Посещения по дням недели")
-    plt.bar(counter.keys(), counter.values())
-    plt.xticks(rotation=45)
-    plt.show()
-
-
-def plot_by_hours(visits):
-    hours = [v.hour for v in visits]
-    counter = Counter(hours)
-
-    plt.figure()
-    plt.title("Посещения по часам")
-    plt.bar(counter.keys(), counter.values())
-    plt.show()
-
-
-def plot_subscriptions(subs):
-    counter = Counter(subs)
-
-    plt.figure()
-    plt.title("Популярность абонементов")
-    plt.bar(counter.keys(), counter.values())
-    plt.show()
-
-
 def main():
     visits = load_visits()
     subs = load_subscriptions()
 
     if not visits:
-        print("Нет данных для графиков")
+        print("Нет данных")
         return
 
-    plot_by_days(visits)
-    plot_by_hours(visits)
-    plot_subscriptions(subs)
+    # ---------- ДНИ НЕДЕЛИ ----------
+    days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    day_counter = Counter([v.strftime("%A") for v in visits])
+    day_values = [day_counter.get(day, 0) for day in days_order]
+
+    # ---------- ЧАСЫ ----------
+    hours_range = list(range(7, 24))  # 07:00 - 23:00
+    hour_counter = Counter([v.hour for v in visits])
+    hour_values = [hour_counter.get(h, 0) for h in hours_range]
+
+    # ---------- АБОНЕМЕНТЫ ----------
+    subs_order = ["Разовый", "Недельный", "Месячный", "Годовой"]
+    sub_counter = Counter(subs)
+    sub_values = [sub_counter.get(s, 0) for s in subs_order]
+
+    # ---------- ГРАФИКИ ----------
+    fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+
+    # 1. Дни недели
+    axes[0].bar(days_order, day_values)
+    axes[0].set_title("Посещения по дням недели")
+    axes[0].set_ylim(0, 10)
+    axes[0].set_yticks(range(0, 11))
+
+    # 2. Часы
+    axes[1].bar(hours_range, hour_values)
+    axes[1].set_title("Посещения по часам")
+    axes[1].set_ylim(0, 10)
+    axes[1].set_yticks(range(0, 11))
+    axes[1].set_xticks(hours_range)
+
+    # 3. Абонементы
+    axes[2].bar(subs_order, sub_values)
+    axes[2].set_title("Популярность абонементов")
+    axes[2].set_ylim(0, 10)
+    axes[2].set_yticks(range(0, 11))
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
